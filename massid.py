@@ -34,7 +34,8 @@ class MID:
 	current_links = deque()
 	seen_links = []
 	download_count = 0
-	excludes = ['thumbs', 'thumb']
+	excludes = ['thumbs', 'thumb', 'video']
+	includes = ['img', 'image']
 
 	def __init__(self, base_url, limit):
 		if 'https' in base_url:
@@ -66,6 +67,13 @@ class MID:
 			else:
 				url = self.proto + url
 		return url
+
+	def allLegal(self, str):
+		illegalcharset = '!@$^*()[]\'\"<>'
+		if any(c in str for c in illegalcharset):
+			return False
+		else:
+			return True
 
 
 	def downloadAll(self):
@@ -108,7 +116,12 @@ class MID:
 			else:
 				# Download and parse webpage
 				print """ Reading: """, curl
-				page_data = urllib2.urlopen(curl)
+				try:
+					page_data = urllib2.urlopen(curl)
+				except:
+					page_data = "<html></html>"
+					pass
+
 				soup = BeautifulSoup(page_data.read(), 'lxml')
 
 				# Get all link data and build links for the next pages
@@ -135,7 +148,7 @@ class MID:
 					if any(word in imgLink for word in self.excludes):
 						pass
 					else:
-						if ( (imgLink not in self.img_list) and ('http' in imgLink[:4]) and (self.base in imgLink) ):
+						if ( (imgLink not in self.img_list) and ('http' in imgLink[:4]) and (self.base in imgLink) and (self.allLegal(imgLink)) ):
 							self.img_list.append(imgLink)
 						else:
 							pass
