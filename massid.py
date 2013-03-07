@@ -5,6 +5,7 @@ from bs4 import BeautifulSoup, SoupStrainer
 class DownloadThread(threading.Thread):
 	def __init__(self, urls):
 		threading.Thread.__init__(self)
+		self.base = base
 		self.urls = urls
 		self.count = 0
 
@@ -13,15 +14,19 @@ class DownloadThread(threading.Thread):
 			parts = link.split('/')
 			imgName = parts[-1]
 			website = parts[2]
-			path = os.path. join(website , imgName)
-			if not os.path.exists(website):
-				os.makedirs(website)
-			try:
-				urllib.urlretrieve(link, path)
-				print 'Downloaded: ',  imgName
-				self.count += 1
-			except:
+
+			if (imgName == ''):
 				pass
+			else:
+				path = os.path. join(website , imgName)
+				if not os.path.exists(website):
+					os.makedirs(website)
+				try:
+					urllib.urlretrieve(link, path)
+					print 'Downloaded: ',  imgName
+					self.count += 1
+				except:
+					pass
 
 
 class MID:
@@ -130,7 +135,7 @@ class MID:
 					if any(word in imgLink for word in self.excludes):
 						pass
 					else:
-						if imgLink not in self.img_list:
+						if ( (imgLink not in self.img_list) and ('http' in imgLink[:4]) and (self.base in imgLink) ):
 							self.img_list.append(imgLink)
 						else:
 							pass
