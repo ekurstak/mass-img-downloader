@@ -1,14 +1,35 @@
-import urllib, urllib2, sys, os, time
+import urllib, urllib2, sys, os, time, threading
+from collections import deque
 from bs4 import BeautifulSoup, SoupStrainer
 
-class MassDownloader:
+class DownloadThread(threading.Thread):
+	def __init__(self, urls):
+		threading.Thread.__init__(self)
+		self.urls = urls
+		self.count = 0
 
+	def run(self):
+		for link in self.urls:
+			parts = link.split('/')
+			imgName = parts[-1]
+			website = parts[2]
+			path = os.path. join(website , imgName)
+			if not os.path.exists(website):
+				os.makedirs(website)
+			try:
+				urllib.urlretrieve(link, path)
+				print 'Downloaded: ',  imgName
+				self.count += 1
+			except:
+				pass
+
+
+class MID:
 	img_list = []
-	link_history = []
-	# words that filter the image urls
-	# (if a word in this array is found in an image url, it wont be downloaded)
+	current_links = deque()
+	seen_links = []
+	download_count = 0
 	excludes = ['thumbs', 'thumb']
-
 
 	def __init__(self, base_url, limit):
 		if 'https' in base_url:
@@ -21,14 +42,18 @@ class MassDownloader:
 		self.startTime = time.time()
 
 	def printStats(self):
-		print """ # of images downloaded: """, len(self.img_list)
-		print """ # of pages visited:     """, len(self.link_history)
+		print """"""
+		print """++++++++++++++++++++++++++++++++++++++"""
+		print """ Downloading finished! """
+		print """ # of images downloaded: """, self.download_count
+		print """ # of pages visited:     """, len(self.seen_links)
 		print """ Total time elapsed:     """, (time.time() - self.startTime)
+		print """++++++++++++++++++++++++++++++++++++++"""
+		print """"""
 
 	def validateURL(self, url):
 		if self.proto not in url:
 			if self.base not in url:
-				print "1"
 				if url[0] == '/':
 					url = self.proto + self.base + url
 				else:
@@ -37,64 +62,84 @@ class MassDownloader:
 				url = self.proto + url
 		return url
 
-	def downloadImg(self, url ):
-		parts = url.split('/')
-		imgName = parts[-1]
-		website = parts[2]
-		path = os.path.join(website , imgName)
-		if not os.path.exists(website):
-			os.makedirs(website)
-		urllib.urlretrieve(url, path)
-		print 'Downloaded: ', imgName
 
 	def downloadAll(self):
-		for image in self.img_list:
-			self.downloadImg(image)
+		print """"""
+		print """++++++++++++++++++++++++++++++++++++++"""
+		print """ Starting downloads now... Sit Tight. """
+		print """ # of images to download: """, len(self.img_list)
+		print """++++++++++++++++++++++++++++++++++++++"""
+		print """"""
+		# I chose to use 2 threads. Could be better, but worked for me.
+		imgs_one = self.img_list[:len(self.img_list)/2]
+		imgs_two = self.img_list[len(self.img_list)/2:]
+		dt1 = DownloadThread(imgs_one)
+		dt2 = DownloadThread(imgs_two)
+		dt1.start()
+		dt2.start()
+		dt1.join()
+		dt2.join()
+		self.download_count = dt1.count + dt2.count
 
-	def crawl(self, url, depth):
-		if ( (depth == 0) or (len(self.img_list) >= int(self.limit)) ):
-			return 0
-		if url in self.link_history:
-			pass
-		else:
-			self.link_history.append(url)
-			print """ Read:  """, url
-			# Download page contents and beautify it
+	def crawl(self, url):
+		self.current_links.append(url)
 
-			page_data = urllib2.urlopen(url)
-			soup = BeautifulSoup(page_data.read(), 'lxml')
+		print """"""
+		print """++++++++++++++++++++++++++++++++++++++"""
+		print """ Starting to crawl website... """
+		print """ Base URL: """, url
+		print """++++++++++++++++++++++++++++++++++++++"""
+		print """"""
 
-			# Grab all image data and download images
+		while self.current_links:
 
-			images = soup.findAll('img')
-			for i in images:
-				imgLink = self.validateURL(i['src'])
-				if any(word in imgLink for word in self.excludes):
-					pass
-				else:
-					if imgLink not in self.img_list:
-						self.img_list.append(imgLink)
-						print len(self.img_list), '/', self.limit
-					else:
+			# Get current working url and check if it hasnt already been seen
+
+			curl = self.current_links.popleft()
+
+			if curl in self.seen_links:
+				print """ Already seen....  """, curl
+				pass
+			else:
+				# Download and parse webpage
+				print """ Reading: """, curl
+				page_data = urllib2.urlopen(curl)
+				soup = BeautifulSoup(page_data.read(), 'lxml')
+
+				# Get all link data and build links for the next pages
+
+				links = soup.findAll('a')
+				for link in links:
+					if ( (self.base not in link['href']) and (link['href'][0] != '/') ):
 						pass
-					#self.downloadImg(imgLink)
-
-			# Get all link data and build links for the next pages
-
-			links = soup.findAll('a')
-			for link in links:
-				if self.base not in link['href']:
-					pass
-				else:
-					plink = self.validateURL(link['href'])
-					if plink not in self.link_history:
-						self.crawl(plink, depth-1)
 					else:
+						plink = self.validateURL(link['href'])
+						if ( (plink in self.seen_links) or (plink in self.current_links) ):
+							pass
+						else:
+							self.current_links.append(plink)
+
+				# Get all image links and add to storage
+
+				images = soup.findAll('img')
+				for i in images:
+					if (len(self.img_list) >= int(self.limit)):
+						self.current_links.clear()
 						pass
+					imgLink = self.validateURL(i['src'])
+					if any(word in imgLink for word in self.excludes):
+						pass
+					else:
+						if imgLink not in self.img_list:
+							self.img_list.append(imgLink)
+						else:
+							pass
+
+				self.seen_links.append(curl)
 
 
 
-mid = MassDownloader(sys.argv[1], sys.argv[2])
-mid.crawl(sys.argv[1], -1)
+mid = MID(sys.argv[1], sys.argv[2])
+mid.crawl(sys.argv[1])
 mid.downloadAll()
 mid.printStats()
