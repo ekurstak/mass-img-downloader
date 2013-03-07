@@ -118,11 +118,11 @@ class MID:
 				print """ Reading: """, curl
 				try:
 					page_data = urllib2.urlopen(curl)
+					soup = BeautifulSoup(page_data.read(), 'lxml')
 				except:
 					page_data = "<html></html>"
+					soup = BeautifulSoup(page_data, 'lxml')
 					pass
-
-				soup = BeautifulSoup(page_data.read(), 'lxml')
 
 				# Get all link data and build links for the next pages
 
